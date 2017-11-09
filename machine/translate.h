@@ -10,7 +10,7 @@
 //	<virtual page #, physical page #>.
 //
 // DO NOT CHANGE -- part of the machine emulation
-//
+// hi 
 // Copyright (c) 1992-1993 The Regents of the University of California.
 // All rights reserved.  See copyright.h for copyright notice and limitation 
 // of liability and disclaimer of warranty provisions.
