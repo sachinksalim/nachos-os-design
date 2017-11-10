@@ -211,47 +211,45 @@ ProcessAddressSpace::~ProcessAddressSpace()
 int
 ProcessAddressSpace::AllocateSharedTable(int shmsize)
 {
-    int pid = currentThread->GetPID();
+    //int pid = currentThread->GetPID();
 
     int origpages = GetNumPages(); // number of current entries
     int i;
 
 
-    int newpages = shmsize/PageSize;
-    if(shmsize%PageSize)
-        newpages += 1;
+    int newpages = divRoundUp(shmsize, PageSize);
 
-    int totalpages = origpages + newpages;
+    numVirtualPages = origpages + newpages;
 
     ASSERT(newpages+numPagesAllocated <= NumPhysPages);
 
     TranslationEntry* oldpagetable = GetPageTable();
-    TranslationEntry* newpagetable = new TranslationEntry[totalpages];
+    KernelPageTable = new TranslationEntry[numVirtualPages ];
 
     for (i = 0; i < origpages; i++) {
-        newpagetable[i].virtualPage = i;
-        newpagetable[i].physicalPage = oldpagetable[i].physicalPage;
-        newpagetable[i].valid = oldpagetable[i].valid;
-        newpagetable[i].use = oldpagetable[i].use;
-        newpagetable[i].dirty = oldpagetable[i].dirty;
-        newpagetable[i].readOnly = oldpagetable[i].readOnly;
-        newpagetable[i].shared = oldpagetable[i].shared;                                              // pages to be read-only
+        KernelPageTable[i].virtualPage = i;
+        KernelPageTable[i].physicalPage = oldpagetable[i].physicalPage;
+        KernelPageTable[i].valid = oldpagetable[i].valid;
+        KernelPageTable[i].use = oldpagetable[i].use;
+        KernelPageTable[i].dirty = oldpagetable[i].dirty;
+        KernelPageTable[i].readOnly = oldpagetable[i].readOnly;
+        KernelPageTable[i].shared = oldpagetable[i].shared;                                              // pages to be read-only
     }
-    for(; i < totalpages; i++) {
-        newpagetable[i].virtualPage = i;
-        newpagetable[i].physicalPage = numPagesAllocated++;
-        newpagetable[i].valid = TRUE;
-        newpagetable[i].use = FALSE;
-        newpagetable[i].dirty = FALSE;
-        newpagetable[i].readOnly = FALSE;
-        newpagetable[i].shared = TRUE;
-        bzero(&machine->mainMemory[newpagetable[i].physicalPage*PageSize], PageSize);
+    for(; i < numVirtualPages; i++) {
+        KernelPageTable[i].virtualPage = i;
+        KernelPageTable[i].physicalPage = numPagesAllocated++;
+        KernelPageTable[i].valid = TRUE;
+        KernelPageTable[i].use = FALSE;
+        KernelPageTable[i].dirty = FALSE;
+        KernelPageTable[i].readOnly = FALSE;
+        KernelPageTable[i].shared = TRUE;
+        bzero(&machine->mainMemory[KernelPageTable[i].physicalPage*PageSize], PageSize);
     }
 
     delete oldpagetable;
 
-    machine->KernelPageTable = newpagetable;
-    machine->KernelPageTableSize = totalpages;
+    machine->KernelPageTable = KernelPageTable;
+    machine->KernelPageTableSize = numVirtualPages ;
 
     return origpages*PageSize;
 
