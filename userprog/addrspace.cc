@@ -136,7 +136,7 @@ ProcessAddressSpace::ProcessAddressSpace(OpenFile *executable)
 ProcessAddressSpace::ProcessAddressSpace(ProcessAddressSpace *parentSpace)
 {
     numVirtualPages = parentSpace->GetNumPages();
-    unsigned i, size = numVirtualPages * PageSize;
+    unsigned i, j, size = numVirtualPages * PageSize;
 
     ASSERT(numVirtualPages+numPagesAllocated <= NumPhysPages);                // check we're not trying
                                                                                 // to run anything too big --
@@ -152,8 +152,10 @@ ProcessAddressSpace::ProcessAddressSpace(ProcessAddressSpace *parentSpace)
         KernelPageTable[i].virtualPage = i;
         if(parentPageTable[i].shared)
             KernelPageTable[i].physicalPage = parentPageTable[i].physicalPage;
-        else
+        else {
             KernelPageTable[i].physicalPage = i+numPagesAllocated;
+            bzero(&machine->mainMemory[KernelPageTable[i].physicalPage*PageSize], PageSize);
+        }
         KernelPageTable[i].valid = parentPageTable[i].valid;
         KernelPageTable[i].use = parentPageTable[i].use;
         KernelPageTable[i].dirty = parentPageTable[i].dirty;
@@ -164,13 +166,26 @@ ProcessAddressSpace::ProcessAddressSpace(ProcessAddressSpace *parentSpace)
     }
 
     // Copy the contents
-    unsigned startAddrParent = parentPageTable[0].physicalPage*PageSize;
-    unsigned startAddrChild = numPagesAllocated*PageSize;
-    for (i=0; i<size; i++) {
-       machine->mainMemory[startAddrChild+i] = machine->mainMemory[startAddrParent+i];
+    unsigned startAddrParent;
+    unsigned startAddrChild;
+    for (i=0; i<numVirtualPages; i++) {
+        if(!KernelPageTable[i].shared) {
+            startAddrParent = parentPageTable[i].physicalPage*PageSize;
+            startAddrChild = KernelPageTable[i].physicalPage*PageSize;
+            for(j=0; j<PageSize;++j) {
+                machine->mainMemory[startAddrChild+j] = machine->mainMemory[startAddrParent+j];
+            }
+        }
     }
 
-    numPagesAllocated += numVirtualPages;
+/*
+    startAddrParent = parentPageTable[0].physicalPage*PageSize;
+    startAddrChild = KernelPageTable[0].physicalPage*PageSize;
+    for (i=0; i<size; i++) {
+        machine->mainMemory[startAddrChild+i] = machine->mainMemory[startAddrParent+i];
+    }
+
+    numPagesAllocated += numVirtualPages;*/
 }
 
 //----------------------------------------------------------------------
@@ -198,17 +213,17 @@ ProcessAddressSpace::AllocateSharedTable(int shmsize)
 {
     int pid = currentThread->GetPID();
 
-    unsigned origpages = GetNumPages(); // number of current entries
+    int origpages = GetNumPages(); // number of current entries
     int i;
 
 
-    unsigned newpages = shmsize/PageSize;
+    int newpages = shmsize/PageSize;
     if(shmsize%PageSize)
         newpages += 1;
 
-    unsigned totalpages = origpages + newpages;
+    int totalpages = origpages + newpages;
 
-    ASSERT(totalpages+numPagesAllocated <= NumPhysPages);
+    ASSERT(newpages+numPagesAllocated <= NumPhysPages);
 
     TranslationEntry* oldpagetable = GetPageTable();
     TranslationEntry* newpagetable = new TranslationEntry[totalpages];
@@ -230,6 +245,7 @@ ProcessAddressSpace::AllocateSharedTable(int shmsize)
         newpagetable[i].dirty = FALSE;
         newpagetable[i].readOnly = FALSE;
         newpagetable[i].shared = TRUE;
+        bzero(&machine->mainMemory[newpagetable[i].physicalPage*PageSize], PageSize);
     }
 
     delete oldpagetable;

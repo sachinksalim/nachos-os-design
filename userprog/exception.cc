@@ -304,13 +304,13 @@ ExceptionHandler(ExceptionType which)
     else if ((which == SyscallException) && (type == SysCall_ShmAllocate)) {
        int shmsize = machine->ReadRegister(4);
        int startAddr = currentThread->space->AllocateSharedTable(shmsize);
-
         // Advance program counters.
        machine->WriteRegister(PrevPCReg, machine->ReadRegister(PCReg));
        machine->WriteRegister(PCReg, machine->ReadRegister(NextPCReg));
        machine->WriteRegister(NextPCReg, machine->ReadRegister(NextPCReg)+4);
-
-       machine->WriteRegister(2, startAddr); 
+       printf("\nshm: %d\nstart: %d\n",shmsize,startAddr);
+       machine->WriteRegister(2, startAddr);
+       printf("\nCompleted!\n");
     }
     else {
 	printf("Unexpected user mode exception %d %d\n", which, type);
